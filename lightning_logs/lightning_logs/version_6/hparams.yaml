@@ -1,0 +1,6 @@
+attention_head_size: 1
+dropout: 0.1
+hidden_continuous_size: 8
+hidden_size: 8
+learning_rate: 0.004365158322401661
+optimizer: adam
