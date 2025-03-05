@@ -113,7 +113,6 @@ if __name__ == "__main__":
     print(f"Total validation batches: {len(val_dataloader)}")
     print(f"Total test batches: {len(test_dataloader)}")
 
-
     # Initialize the TFT Lightning Model
     tft_lightning = TFTLightningModel(training, **hparams)
 
@@ -138,7 +137,7 @@ if __name__ == "__main__":
     # Create PyTorch Lightning Trainer
     trainer = pl.Trainer(
         max_epochs=50,
-        accelerator="mps",
+        accelerator="gpu",
         enable_model_summary=True,
         gradient_clip_val=0.6855404861731059,
         limit_train_batches=1.0,
@@ -151,7 +150,7 @@ if __name__ == "__main__":
     trainer.fit(tft_lightning, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
     # Ensure a checkpoint was saved
-    best_model_path = "/Users/tracyli/GHI_forecasting/checkpoints/tft-best-epoch=49-val_loss=0.07.ckpt" #checkpoint_callback.best_model_path
+    best_model_path = "checkpoints/tft-best-epoch=49-val_loss=0.07.ckpt" # checkpoint_callback.best_model_path
     if not best_model_path:
         raise ValueError("No checkpoint was saved! Ensure ModelCheckpoint is in trainer callbacks.")
 
@@ -171,24 +170,22 @@ if __name__ == "__main__":
     print("Validation MAE:", MAE()(predictions.output, predictions.y))
 
 
-    # raw_predictions = best_tft.model.predict(
-    #     val_dataloader, mode="raw", return_x=True, trainer_kwargs=dict(accelerator="cpu")
-    # )
-    # print("Batch size of raw_predictions:", raw_predictions.shape[0])
-    
-    
+    raw_predictions = best_tft.model.predict(
+        val_dataloader, mode="raw", return_x=True, trainer_kwargs=dict(accelerator="cpu")
+    )
+    print("Batch size of raw_predictions:", raw_predictions.shape[0])
 
-    # # Plot 10 example predictions
-    # for idx in range(10):
-    #     try:
-    #         best_tft.model.plot_prediction(
-    #             raw_predictions.x,  # ✅ Correct network input
-    #             raw_predictions.output,  # ✅ Pass full output dictionary
-    #             idx=idx,  
-    #             add_loss_to_title=True  
-    #         )
-    #     except Exception as e:
-    #         print(f"Skipping index {idx} due to error: {e}")
+    # Plot 10 example predictions
+    for idx in range(10):
+        try:
+            best_tft.model.plot_prediction(
+                raw_predictions.x,  # ✅ Correct network input
+                raw_predictions.output,  # ✅ Pass full output dictionary
+                idx=idx,  
+                add_loss_to_title=True  
+            )
+        except Exception as e:
+            print(f"Skipping index {idx} due to error: {e}")
 
 
 

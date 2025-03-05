@@ -19,7 +19,7 @@ class ResidualBlock(nn.Module):
         return x
 
 class TiDE(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, context_size, horizon, num_layers=2, dropout=0.1):
+    def __init__(self, input_dim, hidden_dim, output_dim, context_size, horizon, num_encoder_layers=2, num_decoder_layers=2, decoder_output_dim=16, temporal_decoder_hidden=64, dropout=0.1):
         super(TiDE, self).__init__()
         self.context_size = context_size
         self.horizon = horizon
@@ -29,16 +29,17 @@ class TiDE(nn.Module):
         
         # Dense Encoder
         self.encoder = nn.Sequential(
-            *[ResidualBlock(input_dim * context_size, hidden_dim, dropout) for _ in range(num_layers)]
+            *[ResidualBlock(input_dim * context_size, hidden_dim, dropout) for _ in range(num_encoder_layers)]
         )
         
         # Dense Decoder
         self.decoder = nn.Sequential(
-            *[ResidualBlock(hidden_dim, hidden_dim, dropout) for _ in range(num_layers)]
+            *[ResidualBlock(hidden_dim, hidden_dim, dropout) for _ in range(num_decoder_layers)]
         )
         
         # Temporal Decoder (per time-step in horizon)
-        self.temporal_decoder = nn.Linear(hidden_dim + input_dim, 1)  # Linear highway to allow future covariates
+        self.temporal_decoder = ResidualBlock(hidden_dim + input_dim, temporal_decoder_hidden, dropout)
+        self.output_layer = nn.Linear(temporal_decoder_hidden, 1)  # Linear highway to allow future covariates
 
         # Global residual connection
         self.global_residual = nn.Linear(context_size, horizon)
@@ -59,7 +60,8 @@ class TiDE(nn.Module):
         decoding = decoding.view(batch_size, self.horizon, -1)
         
         # Temporal decoding with future covariates
-        y_pred = self.temporal_decoder(torch.cat([decoding, covariates_future], dim=-1)).squeeze(-1)
+        temp_decoded = self.temporal_decoder(torch.cat([decoding, covariates_future], dim=-1))
+        y_pred = self.output_layer(temp_decoded).squeeze(-1)
         
         # Global residual connection
         y_pred += self.global_residual(x_past).squeeze(-1)
