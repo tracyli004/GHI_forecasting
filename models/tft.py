@@ -31,6 +31,10 @@ tf.io.gfile = tf.compat.v1.io.gfile
 # Example dataset (for testing models)
 # You likely don't need this unless you're running example scripts.
 # from pytorch_forecasting.data.examples import get_stallion_data  # Optional
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="lightning.pytorch.utilities.parsing")
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # Suppress TensorFlow logs
 
 
 from data.dataloading import get_training, get_dataloaders
@@ -49,7 +53,7 @@ if __name__ == "__main__":
 #     # baseline_predictions = Baseline().predict(val_dataloader, return_y=True)
 #     # baseline_mae = MAE()(baseline_predictions.output, baseline_predictions.y)
 #     # print("Baseline MAE:", baseline_mae)
-#     # # Baseline MAE: tensor(0.2927, device='mps:0')
+#     # # Baseline MAE: 0.2927
 
     pl.seed_everything(42)
     class TFTLightningModel(pl.LightningModule):
@@ -100,14 +104,21 @@ if __name__ == "__main__":
             return val_dataloader
 
     hparams = {
-        "learning_rate": 0.004365158322401661,
+        "learning_rate": 0.08906539082147183,
         "lstm_layers": 2,
-        "hidden_size": 8,
-        "attention_head_size": 4,
+        "hidden_size": 10,
+        "attention_head_size": 1,
         "dropout": 0.2328434370945469,
         "hidden_continuous_size": 8,
         "optimizer": "adam",
     }
+    
+     # 1. parameters: {'gradient_clip_val': 0.6855404861731059, 
+    #              'hidden_size': 10, 
+    #              'dropout': 0.2328434370945469, 
+    #              'hidden_continuous_size': 8, 
+    #              'attention_head_size': 1, 
+    #              'learning_rate': 0.08906539082147183}
     
     print(f"Total training batches: {len(train_dataloader)}")
     print(f"Total validation batches: {len(val_dataloader)}")
@@ -147,107 +158,84 @@ if __name__ == "__main__":
     )
     
 
-    trainer.fit(tft_lightning, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+    # trainer.fit(tft_lightning, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
-    # Ensure a checkpoint was saved
-    best_model_path = "checkpoints/tft-best-epoch=49-val_loss=0.07.ckpt" # checkpoint_callback.best_model_path
-    if not best_model_path:
-        raise ValueError("No checkpoint was saved! Ensure ModelCheckpoint is in trainer callbacks.")
+    # # Ensure a checkpoint was saved
+    # best_model_path = checkpoint_callback.best_model_path
+    # if not best_model_path:
+    #     raise ValueError("No checkpoint was saved! Ensure ModelCheckpoint is in trainer callbacks.")
+    # print(f"Best model saved at: {best_model_path}")
 
-    print(f"Best model saved at: {best_model_path}")
+    # # Recreate the dataset before loading the model
+    # training = get_training()
 
-    # ✅ Recreate the dataset before loading the model
-    training = get_training()
-
-    # ✅ Load the best model from the checkpoint
-    best_tft = TFTLightningModel.load_from_checkpoint(best_model_path, dataset=training)
-    best_tft.model = TemporalFusionTransformer.from_dataset(training, **best_tft.hparams)
-
-    # ✅ Make Predictions
-    predictions = best_tft.model.predict(
-        val_dataloader, return_y=True, trainer_kwargs=dict(accelerator="cpu")
-    )
-    print("Validation MAE:", MAE()(predictions.output, predictions.y))
-
-
-    raw_predictions = best_tft.model.predict(
-        val_dataloader, mode="raw", return_x=True, trainer_kwargs=dict(accelerator="cpu")
-    )
-    print("Batch size of raw_predictions:", raw_predictions.shape[0])
-
-    # Plot 10 example predictions
-    for idx in range(10):
-        try:
-            best_tft.model.plot_prediction(
-                raw_predictions.x,  # ✅ Correct network input
-                raw_predictions.output,  # ✅ Pass full output dictionary
-                idx=idx,  
-                add_loss_to_title=True  
-            )
-        except Exception as e:
-            print(f"Skipping index {idx} due to error: {e}")
-
-
-
-    # # ✅ Get raw predictions (for uncertainty analysis)
-    # raw_predictions = best_tft.model.predict(
-    #     val_dataloader, mode="raw", return_x=True, trainer_kwargs=dict(accelerator="cpu")
-    # )
+    # # Load the best model from the checkpoint
+    # best_model_path = "checkpoints/tft-best-epoch=07-val_loss=0.07-v2.ckpt"
+    # best_tft = TFTLightningModel.load_from_checkpoint(best_model_path, dataset=training)
+    # best_tft.model = TemporalFusionTransformer.from_dataset(training, **best_tft.hparams)
     
-    # print("Type of raw_predictions.output:", type(raw_predictions.output))
-    # print("Contents of raw_predictions.output:", raw_predictions.output)
-
-    # print("Keys in raw_predictions:", raw_predictions.keys())
-    # print("Shape of x:", raw_predictions.x["encoder_cont"].shape if "encoder_cont" in raw_predictions.x else "Not found")
-    # print("Shape of output:", raw_predictions.output.shape if raw_predictions.output is not None else "Output is None")
-
-
-    # # ✅ Plot 10 example predictions
-    # for idx in range(10):
-    #     best_tft.model.plot_prediction(  # ✅ Use `best_tft.model`
-    #         raw_predictions.x, raw_predictions.output, idx=idx, add_loss_to_title=True
-    #     )
+    # # Make Predictions
+    # predictions = best_tft.model.predict(
+    #     val_dataloader, return_y=True, trainer_kwargs=dict(accelerator="cpu")
+    # )
+    # print("Validation MAE:", MAE()(predictions.output, predictions.y))
 
 
+    # raw_predictions = best_tft.model.predict(
+    #     val_dataloader, mode="raw", return_x=True, trainer_kwargs=dict(accelerator="gpu")
+    # )
 
+    # print(f"Total validation batches: {len(val_dataloader)}")
+    
+    
+    # import matplotlib.pyplot as plt
+    # import pandas as pd
 
-
-
+    # # Plot the TFT model prediction
+    # best_tft.model.plot_prediction(
+    #     x=raw_predictions.x,  
+    #     out=raw_predictions.output,  
+    #     idx=0,  
+    #     add_loss_to_title=True,
+    # )
+    # plt.savefig("prediction_plot.png")
+    # print("Plot saved as prediction_plot.png")
     
     # create study
-    # study = optimize_hyperparameters(
-    #     train_dataloader,
-    #     val_dataloader,
-    #     model_path="optuna_test",
-    #     n_trials=200,
-    #     max_epochs=50,
-    #     gradient_clip_val_range=(0.01, 1.0),
-    #     hidden_size_range=(8, 128),
-    #     hidden_continuous_size_range=(8, 128),
-    #     attention_head_size_range=(1, 8),
-    #     lstm_layers_range=(1, 3),
-    #     max_encoder_length_range=(10, 100),
-    #     # learning_rate_range=(0.001, 0.1),
-    #     dropout_range=(0.1, 0.3),
-    #     trainer_kwargs=dict(limit_train_batches=30),
-    #     reduce_on_plateau_patience=4,
-    #     # use_learning_rate_finder=False,  # use Optuna to find ideal learning rate or use in-built learning rate finder
-    # )
+    study = optimize_hyperparameters(
+        train_dataloader,
+        val_dataloader,
+        model_path="optuna_test",
+        n_trials=200,
+        max_epochs=50,
+        gradient_clip_val_range=(0.01, 1.0),
+        hidden_size_range=(8, 128),
+        hidden_continuous_size_range=(8, 128),
+        attention_head_size_range=(1, 4),
+        learning_rate_range=(0.001, 0.1),
+        dropout_range=(0.1, 0.3),
+        trainer_kwargs=dict(limit_train_batches=30, log_every_n_steps=5),
+        reduce_on_plateau_patience=4,
+        use_learning_rate_finder=False,  # use Optuna to find ideal learning rate or use in-built learning rate finder
+    )
 
     # save study results - also we can resume tuning at a later point in time
-    # with open("test_study.pkl", "wb") as fout:
-    #     pickle.dump(study, fout)
+    with open("test_study.pkl", "wb") as fout:
+        pickle.dump(study, fout)
 
-    # # show best hyperparameters
-    # print(study.best_trial.params)
-    
-    
+    # show best hyperparameters
+    print(study.best_trial.params)
     # 1. parameters: {'gradient_clip_val': 0.6855404861731059, 
     #              'hidden_size': 10, 
     #              'dropout': 0.2328434370945469, 
     #              'hidden_continuous_size': 8, 
     #              'attention_head_size': 1, 
     #              'learning_rate': 0.08906539082147183}
+    
+    
+    
+    
+    
     
     # tuner = Tuner(trainer)
     # try:

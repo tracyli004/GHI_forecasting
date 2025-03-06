@@ -26,11 +26,11 @@ data_df["Year"] = (data_df["Year"].astype(int) - data_df["Year"].astype(int).min
 
 
 # Define max encoder & prediction length
-max_prediction_length = 90  # Rolling forecast
-max_encoder_length = 365  # Use past 24 days to make predictions
+max_prediction_length = 365  # Rolling forecast
+max_encoder_length = 730  # Use past 24 days to make predictions
 
-train_cutoff = data_df["time_idx"].max() - (2 *365)  # Training stops 2 years before last
-val_cutoff = data_df["time_idx"].max() - 365  # Validation stops 1 year before last
+train_cutoff = data_df["time_idx"].max() - (4*365)  # Training stops 2 years before last
+val_cutoff = data_df["time_idx"].max() - (365*2)  # Validation stops 1 year before last
 
 train_df = data_df[data_df["time_idx"] <= train_cutoff]
 val_df = data_df[(data_df["time_idx"] > train_cutoff) & (data_df["time_idx"] <= val_cutoff)]
@@ -92,9 +92,9 @@ test = TimeSeriesDataSet.from_dataset(
 
 # Convert to dataloaders
 batch_size = 128
-train_dataloader = training.to_dataloader(train=True, batch_size=batch_size, num_workers=10, persistent_workers=True)
-val_dataloader = validation.to_dataloader(train=False, batch_size=batch_size * 10, num_workers=10, persistent_workers=True)
-test_dataloader = test.to_dataloader(train=False, batch_size=batch_size * 10, num_workers=10, persistent_workers=True)
+train_dataloader = training.to_dataloader(train=True, batch_size=batch_size, num_workers=1, persistent_workers=True)
+val_dataloader = validation.to_dataloader(train=False, batch_size=batch_size * 10, num_workers=1, persistent_workers=True)
+test_dataloader = test.to_dataloader(train=False, batch_size=batch_size * 10, num_workers=1, persistent_workers=True)
 
 # print("DataLoader setup complete!")
 
