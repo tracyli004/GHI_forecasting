@@ -18,10 +18,10 @@ data_df["Year"] = data_df["Year"].astype("category")
 data_df["Month"] = data_df["Month"].astype("category")
 data_df["Day"] = data_df["Day"].astype("category")
 
-# Apply log transformations to stabilize variance for skewed variables
-log_cols = ["Average Ozone", "Average AOD", "Total GHI"]
-for col in log_cols:
-    data_df[col] = np.log(data_df[col] + 1e-8)
+# # Apply log transformations to stabilize variance for skewed variables
+# log_cols = ["Average Ozone", "Average AOD", "Total GHI"]
+# for col in log_cols:
+#     data_df[col] = np.log(data_df[col] + 1e-8)
 
 # Create grouped statistical features (mean by time index)
 grouped_features = {
@@ -42,7 +42,7 @@ data_df["weather"] = data_df["weather"].astype("category")
 
 # Normalize continuous features
 scaler = MinMaxScaler()
-continuous_cols = ["Average Temperature", "Average Dew Point", "Average Relative Humidity", 
+continuous_cols = ["Average Temperature", "Average Ozone", "Average AOD", "Total GHI", "Average Dew Point", "Average Relative Humidity", 
                    "Average Pressure", "Average Precipitable Water", "Max Temperature", 
                    "Min Temperature", "RMM2", "MJO Amplitude"]
 data_df[continuous_cols] = scaler.fit_transform(data_df[continuous_cols])

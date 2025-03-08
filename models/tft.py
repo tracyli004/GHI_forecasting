@@ -56,6 +56,9 @@ if __name__ == "__main__":
 #     # # Baseline MAE: 0.2927
 
     pl.seed_everything(42)
+    
+    
+    
     class TFTLightningModel(pl.LightningModule):
         def __init__(self, dataset, **hparams):
             super().__init__()
@@ -104,21 +107,15 @@ if __name__ == "__main__":
             return val_dataloader
 
     hparams = {
-        "learning_rate": 0.08906539082147183,
+        "learning_rate": 0.004,
         "lstm_layers": 2,
         "hidden_size": 10,
-        "attention_head_size": 1,
+        "attention_head_size": 2,
         "dropout": 0.2328434370945469,
         "hidden_continuous_size": 8,
         "optimizer": "adam",
     }
     
-     # 1. parameters: {'gradient_clip_val': 0.6855404861731059, 
-    #              'hidden_size': 10, 
-    #              'dropout': 0.2328434370945469, 
-    #              'hidden_continuous_size': 8, 
-    #              'attention_head_size': 1, 
-    #              'learning_rate': 0.08906539082147183}
     
     print(f"Total training batches: {len(train_dataloader)}")
     print(f"Total validation batches: {len(val_dataloader)}")
@@ -147,84 +144,77 @@ if __name__ == "__main__":
 
     # Create PyTorch Lightning Trainer
     trainer = pl.Trainer(
-        max_epochs=50,
+        max_epochs=100,
         accelerator="gpu",
         enable_model_summary=True,
-        gradient_clip_val=0.6855404861731059,
+        gradient_clip_val=0.1,
         limit_train_batches=1.0,
         log_every_n_steps=10,
         callbacks=[lr_logger, early_stop_callback, checkpoint_callback],  
         logger=logger,
     )
     
+    trainer.fit(tft_lightning, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
-    # trainer.fit(tft_lightning, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+    # Ensure a checkpoint was saved
+    best_model_path = checkpoint_callback.best_model_path
+    if not best_model_path:
+        raise ValueError("No checkpoint was saved! Ensure ModelCheckpoint is in trainer callbacks.")
+    print(f"Best model saved at: {best_model_path}")
 
-    # # Ensure a checkpoint was saved
-    # best_model_path = checkpoint_callback.best_model_path
-    # if not best_model_path:
-    #     raise ValueError("No checkpoint was saved! Ensure ModelCheckpoint is in trainer callbacks.")
-    # print(f"Best model saved at: {best_model_path}")
+    # Recreate the dataset before loading the model
+    training = get_training()
 
-    # # Recreate the dataset before loading the model
-    # training = get_training()
-
-    # # Load the best model from the checkpoint
-    # best_model_path = "checkpoints/tft-best-epoch=07-val_loss=0.07-v2.ckpt"
-    # best_tft = TFTLightningModel.load_from_checkpoint(best_model_path, dataset=training)
-    # best_tft.model = TemporalFusionTransformer.from_dataset(training, **best_tft.hparams)
+    # Load the best model from the checkpoint
+    best_model_path = "checkpoints/tft-best-epoch=07-val_loss=0.07-v2.ckpt"
+    best_tft = TFTLightningModel.load_from_checkpoint(best_model_path, dataset=training)
+    best_tft.model = TemporalFusionTransformer.from_dataset(training, **best_tft.hparams)
     
-    # # Make Predictions
-    # predictions = best_tft.model.predict(
-    #     val_dataloader, return_y=True, trainer_kwargs=dict(accelerator="cpu")
-    # )
-    # print("Validation MAE:", MAE()(predictions.output, predictions.y))
-
-
-    # raw_predictions = best_tft.model.predict(
-    #     val_dataloader, mode="raw", return_x=True, trainer_kwargs=dict(accelerator="gpu")
-    # )
-
-    # print(f"Total validation batches: {len(val_dataloader)}")
-    
-    
-    # import matplotlib.pyplot as plt
-    # import pandas as pd
-
-    # # Plot the TFT model prediction
-    # best_tft.model.plot_prediction(
-    #     x=raw_predictions.x,  
-    #     out=raw_predictions.output,  
-    #     idx=0,  
-    #     add_loss_to_title=True,
-    # )
-    # plt.savefig("prediction_plot.png")
-    # print("Plot saved as prediction_plot.png")
-    
-    # create study
-    study = optimize_hyperparameters(
-        train_dataloader,
-        val_dataloader,
-        model_path="optuna_test",
-        n_trials=200,
-        max_epochs=50,
-        gradient_clip_val_range=(0.01, 1.0),
-        hidden_size_range=(8, 128),
-        hidden_continuous_size_range=(8, 128),
-        attention_head_size_range=(1, 4),
-        learning_rate_range=(0.001, 0.1),
-        dropout_range=(0.1, 0.3),
-        trainer_kwargs=dict(limit_train_batches=30, log_every_n_steps=5),
-        reduce_on_plateau_patience=4,
-        use_learning_rate_finder=False,  # use Optuna to find ideal learning rate or use in-built learning rate finder
+    # Make Predictions
+    predictions = best_tft.model.predict(
+        val_dataloader, return_y=True, trainer_kwargs=dict(accelerator="cpu")
     )
+    print("Validation MAE:", MAE()(predictions.output, predictions.y))
 
-    # save study results - also we can resume tuning at a later point in time
-    with open("test_study.pkl", "wb") as fout:
-        pickle.dump(study, fout)
+    raw_predictions = best_tft.model.predict(
+        val_dataloader, mode="raw", return_x=True, trainer_kwargs=dict(accelerator="gpu")
+    )
+    # Plot the TFT model prediction
+    best_tft.model.plot_prediction(
+        x=raw_predictions.x,  
+        out=raw_predictions.output,  
+        idx=0,  
+        add_loss_to_title=True,
+    )
+    plt.savefig("prediction_plot.png")
+    print("Plot saved as prediction_plot.png")
 
-    # show best hyperparameters
-    print(study.best_trial.params)
+    
+
+    # # create study
+    # study = optimize_hyperparameters(
+    #     train_dataloader,
+    #     val_dataloader,
+    #     model_path="optuna_test",
+    #     n_trials=200,
+    #     max_epochs=50,
+    #     gradient_clip_val_range=(0.01, 1.0),
+    #     hidden_size_range=(8, 128),
+    #     hidden_continuous_size_range=(8, 128),
+    #     attention_head_size_range=(1, 4),
+    #     learning_rate_range=(0.001, 0.1),
+    #     dropout_range=(0.1, 0.3),
+    #     trainer_kwargs=dict(limit_train_batches=30, log_every_n_steps=5),
+    #     reduce_on_plateau_patience=4,
+    #     use_learning_rate_finder=False,  # use Optuna to find ideal learning rate or use in-built learning rate finder
+    # )
+
+    # # save study results - also we can resume tuning at a later point in time
+    # with open("test_study.pkl", "wb") as fout:
+    #     pickle.dump(study, fout)
+
+    # # show best hyperparameters
+    # print(study.best_trial.params)
     # 1. parameters: {'gradient_clip_val': 0.6855404861731059, 
     #              'hidden_size': 10, 
     #              'dropout': 0.2328434370945469, 
