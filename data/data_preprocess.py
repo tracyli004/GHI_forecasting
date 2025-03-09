@@ -11,8 +11,6 @@ data_df = data_df.sort_values(["Year", "Month", "Day"]).reset_index(drop=True)
 data_df["time_idx"] = range(len(data_df))
 # data_df["time_idx"] = (data_df["Year"] - data_df["Year"].min()) * 365 + data_df["Day"]
 
-
-
 # Convert categorical variables to category dtype
 data_df["Year"] = data_df["Year"].astype("category")
 data_df["Month"] = data_df["Month"].astype("category")

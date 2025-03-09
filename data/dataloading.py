@@ -92,9 +92,9 @@ test = TimeSeriesDataSet.from_dataset(
 
 # Convert to dataloaders
 batch_size = 128
-train_dataloader = training.to_dataloader(train=True, batch_size=batch_size, num_workers=1, persistent_workers=True)
-val_dataloader = validation.to_dataloader(train=False, batch_size=batch_size * 10, num_workers=1, persistent_workers=True)
-test_dataloader = test.to_dataloader(train=False, batch_size=batch_size * 10, num_workers=1, persistent_workers=True)
+train_dataloader = training.to_dataloader(train=True, batch_size=batch_size, num_workers=10, persistent_workers=True)
+val_dataloader = validation.to_dataloader(train=False, batch_size=batch_size * 10, num_workers=10, persistent_workers=True)
+test_dataloader = test.to_dataloader(train=False, batch_size=batch_size * 10, num_workers=10, persistent_workers=True)
 
 # print("DataLoader setup complete!")
 

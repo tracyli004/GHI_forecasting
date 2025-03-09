@@ -7,10 +7,14 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 import copy
 from pathlib import Path
 import warnings
+import pickle
+import os
 
 from pytorch_forecasting import TimeSeriesDataSet
 from pytorch_forecasting.data import GroupNormalizer
 
+from darts.models import NHiTSModel, TiDEModel
+from darts.metrics import mape
 from darts import TimeSeries
 from darts.dataprocessing.transformers import Scaler
 from darts.datasets import AusBeerDataset
@@ -21,6 +25,9 @@ import logging
 logging.disable(logging.CRITICAL)
 warnings.filterwarnings("ignore")
 
+import torch
+torch.set_default_dtype(torch.float32)
+
 
 
 
@@ -29,7 +36,6 @@ warnings.filterwarnings("ignore")
 optimizer_kwargs = {
     "lr": 1e-3,
 }
-
 # PyTorch Lightning Trainer arguments
 pl_trainer_kwargs = {
     "gradient_clip_val": 1,
@@ -37,13 +43,11 @@ pl_trainer_kwargs = {
     "accelerator": "auto",
     "callbacks": [],
 }
-
 # learning rate scheduler
 lr_scheduler_cls = torch.optim.lr_scheduler.ExponentialLR
 lr_scheduler_kwargs = {
     "gamma": 0.999,
 }
-
 # early stopping (needs to be reset for each model later on)
 # this setting stops training once the the validation loss has not decreased by more than 1e-3 for 10 epochs
 early_stopping_args = {
@@ -52,8 +56,6 @@ early_stopping_args = {
     "min_delta": 1e-3,
     "mode": "min",
 }
-
-#
 common_model_args = {
     "input_chunk_length": 365,  # lookback window
     "output_chunk_length": 365,  # forecast/lookahead window
@@ -84,6 +86,9 @@ print("Total Missing Values in TimeSeries:", series.pd_dataframe().isna().sum().
 train, temp = series.split_after(0.6)
 val, test = temp.split_after(0.5)
 
+train = train.astype(np.float32)
+val = val.astype(np.float32)
+
 
 # create the models
 model_nhits = NHiTSModel(**common_model_args, model_name="hi")
@@ -107,12 +112,6 @@ param_grid = {
     "batch_size": [64, 128],  # Batch size for training
     "dropout": [0.1, 0.3],  # Dropout rate for regularization
 }
-from darts.models import NHiTSModel, TiDEModel
-from darts.metrics import mape  # Mean Absolute Percentage Error
-import pickle
-import os
-
-
 
 # Load previously saved models if they exist
 save_path = "best_models.pkl"
@@ -156,8 +155,7 @@ for name, model in models.items():
 # Train with grid searched params
 for name, model in best_models.items():
     pl_trainer_kwargs["callbacks"] = [EarlyStopping(**early_stopping_args)]
-    best_model = model["name"]
-
+    best_model = model["model"]
     print(f"Training best {name} model...")
     best_model.fit(train, val_series=val, verbose=True)
 
@@ -166,19 +164,20 @@ for name, model in best_models.items():
 
 # Test and plot
 result_accumulator = {}
-
 # Create separate plots for each model
-for name, model in models.items():
+for name, model in best_models.items():
     fig, ax = plt.subplots(figsize=(15, 5))  # Create a new figure for each model
 
     n_steps = 365  # Forecast one full year
-    pred_steps_per_chunk = model.output_chunk_length  # Model predicts in chunks (e.g., 90 days)
+    pred_steps_per_chunk = model["model"].output_chunk_length
+    # pred_steps_per_chunk = model.output_chunk_length  # Model predicts in chunks (e.g., 90 days)
 
     input_series = test[: -n_steps]  # Start with the last known real data
     rolling_predictions = []
-
+    
+    input_series = input_series.astype("float32")
     for _ in range(n_steps // pred_steps_per_chunk):
-        pred = model.predict(n=pred_steps_per_chunk, series=input_series)
+        pred = model["model"].predict(n=pred_steps_per_chunk, series=input_series)
         rolling_predictions.append(pred)
         input_series = input_series.append(pred)  # Feed predictions back into the model
 
@@ -186,6 +185,13 @@ for name, model in models.items():
     full_year_forecast = rolling_predictions[0]
     for pred in rolling_predictions[1:]:
         full_year_forecast = full_year_forecast.concatenate(pred)
+        
+        
+    forecast_df = full_year_forecast.pd_dataframe()
+    forecast_df.columns = [f"{name}_Forecast"]
+    csv_save_path = f"forecast_{name}.csv"
+    forecast_df.to_csv(csv_save_path)
+    print(f"Saved predictions for {name} as {csv_save_path}")
 
     # Plot forecast and actual data
     test[-365:].plot(label="Actual", ax=ax, color='#1f77b4', linewidth=1)
