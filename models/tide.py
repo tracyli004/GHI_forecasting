@@ -39,7 +39,7 @@ optimizer_kwargs = {
 # PyTorch Lightning Trainer arguments
 pl_trainer_kwargs = {
     "gradient_clip_val": 1,
-    "max_epochs": 100,
+    "max_epochs": 200,
     "accelerator": "auto",
     "callbacks": [],
 }
@@ -108,23 +108,36 @@ models = {
 param_grid = {
     "input_chunk_length": [365, 545, 730],  # History window (try 1 yr, 1.5, 2)
     "output_chunk_length": [90, 120, 365],
-    "n_epochs": [50, 100],  # Number of training epochs
-    "batch_size": [64, 128],  # Batch size for training
+    "n_epochs": [50, 100, 200],  # Number of training epochs
+    "batch_size": [64, 128, 256],  # Batch size for training
     "dropout": [0.1, 0.3],  # Dropout rate for regularization
+    "num_encoder_layers": [1, 2, 3],
+    "num_decoder_layers": [1, 2, 3],
+    "decoder_output_dim": [16, 32, 64],
+    "hidden_size": [128, 256, 512],
+    "temporal_width_past": [8, 16, 32],
+    "temporal_width_future": [8, 16, 32],
+    "temporal_hidden_size_past": [64, 128, 256],
+    "temporal_hidden_size_future": [64, 128, 256],
+    "temporal_decoder_hidden": [32, 64, 128]
 }
 
 # Load previously saved models if they exist
-save_path = "best_models.pkl"
+save_path = "best_models_all_params.pkl"
 if os.path.exists(save_path):
     with open(save_path, "rb") as f:
         best_models = pickle.load(f)
 else:
     best_models = {}
 
+
+print(best_models)
     # Loop through models and run grid search
 for name, model in models.items():
     if name in best_models:  # Skip already processed models
         print(f"Skipping {name}, already completed.")
+        continue
+    if name == "NHiTS":
         continue
     
     print(f"Running Grid Search for {name}...")

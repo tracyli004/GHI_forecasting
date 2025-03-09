@@ -27,7 +27,7 @@ data_df["Year"] = (data_df["Year"].astype(int) - data_df["Year"].astype(int).min
 
 # Define max encoder & prediction length
 max_prediction_length = 365  # Rolling forecast
-max_encoder_length = 730  # Use past 2 yrs to make predictions
+max_encoder_length = 365  # Use past 2 yrs to make predictions
 
 train_cutoff = data_df["time_idx"].max() - (4*365)  # Training stops 2 years before last
 val_cutoff = data_df["time_idx"].max() - (365*2)  # Validation stops 1 year before last
